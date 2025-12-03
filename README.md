@@ -42,7 +42,7 @@ This is a **monorepo** containing multiple SDK packages, all auto-generated from
 ### Structure
 
 ```
-emitkit-sdks/
+@emitkit/jss/
 ├── packages/
 │   ├── js/          # TypeScript/JavaScript SDK
 │   └── ...          # Future SDKs
@@ -69,7 +69,7 @@ emitkit-sdks/
 ```bash
 # Clone the repository
 git clone https://github.com/emitkit/emitkit-sdks.git
-cd emitkit-sdks
+cd @emitkit/jss
 
 # Install dependencies
 pnpm install

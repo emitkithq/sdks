@@ -14,7 +14,7 @@ This guide will help you set up the EmitKit SDKs monorepo for development.
 
 ```bash
 git clone https://github.com/emitkit/emitkit-sdks.git
-cd emitkit-sdks
+cd @emitkit/jss
 ```
 
 ### 2. Install Dependencies
@@ -105,7 +105,7 @@ pnpm run test      # Run tests
 ### Option 1: Link Locally
 
 ```bash
-# In emitkit-sdks/packages/js
+# In @emitkit/jss/packages/js
 pnpm link
 
 # In your test project
@@ -117,7 +117,7 @@ pnpm link @emitkit/js
 ```json
 {
   "dependencies": {
-    "@emitkit/js": "file:../emitkit-sdks/packages/js"
+    "@emitkit/js": "file:../@emitkit/jss/packages/js"
   }
 }
 ```
@@ -132,7 +132,7 @@ pnpm tsx examples/basic.ts
 ## Project Structure
 
 ```
-emitkit-sdks/
+@emitkit/jss/
 ├── packages/
 │   └── js/                     # TypeScript SDK
 │       ├── src/

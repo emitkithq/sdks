@@ -235,8 +235,8 @@ After a successful release:
 
 ```bash
 # Create a test project
-mkdir test-emitkit-sdk
-cd test-emitkit-sdk
+mkdir test-@emitkit/js
+cd test-@emitkit/js
 npm init -y
 npm install @emitkit/js
 
