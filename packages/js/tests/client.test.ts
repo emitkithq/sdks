@@ -165,4 +165,160 @@ describe('EmitKit Client', () => {
       expect(result.wasReplayed).toBe(true);
     });
   });
+
+  describe('identity API', () => {
+    it('should identify user with properties', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Map([
+          ['X-RateLimit-Limit', '100'],
+          ['X-RateLimit-Remaining', '99'],
+          ['X-RateLimit-Reset', String(Math.floor(Date.now() / 1000) + 60)]
+        ]),
+        json: async () => ({
+          success: true,
+          data: {
+            id: 'user_identity_123',
+            userId: 'user_456',
+            properties: {
+              email: 'test@example.com',
+              name: 'Test User'
+            },
+            aliases: {
+              created: []
+            },
+            updatedAt: '2025-01-15T10:30:00.000Z'
+          },
+          requestId: 'req_123'
+        })
+      });
+
+      const clientWithMock = new EmitKit('test_key', {
+        fetch: mockFetch as any
+      });
+
+      const result = await clientWithMock.identity.identify({
+        user_id: 'user_456',
+        properties: {
+          email: 'test@example.com',
+          name: 'Test User'
+        }
+      });
+
+      expect(result.data).toBeDefined();
+      expect(result.data.userId).toBe('user_456');
+      expect(result.data.properties.email).toBe('test@example.com');
+    });
+
+    it('should identify user with aliases', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Map([
+          ['X-RateLimit-Limit', '100'],
+          ['X-RateLimit-Remaining', '99'],
+          ['X-RateLimit-Reset', String(Math.floor(Date.now() / 1000) + 60)]
+        ]),
+        json: async () => ({
+          success: true,
+          data: {
+            id: 'user_identity_123',
+            userId: 'user_456',
+            properties: {
+              email: 'test@example.com',
+              name: 'Test User'
+            },
+            aliases: {
+              created: ['test@example.com', 'testuser']
+            },
+            updatedAt: '2025-01-15T10:30:00.000Z'
+          },
+          requestId: 'req_123'
+        })
+      });
+
+      const clientWithMock = new EmitKit('test_key', {
+        fetch: mockFetch as any
+      });
+
+      const result = await clientWithMock.identity.identify({
+        user_id: 'user_456',
+        properties: {
+          email: 'test@example.com',
+          name: 'Test User'
+        },
+        aliases: ['test@example.com', 'testuser']
+      });
+
+      expect(result.data.aliases.created).toHaveLength(2);
+      expect(result.data.aliases.created).toContain('test@example.com');
+      expect(result.data.aliases.created).toContain('testuser');
+    });
+
+    it('should handle partial alias failures', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        headers: new Map([
+          ['X-RateLimit-Limit', '100'],
+          ['X-RateLimit-Remaining', '99'],
+          ['X-RateLimit-Reset', String(Math.floor(Date.now() / 1000) + 60)]
+        ]),
+        json: async () => ({
+          success: true,
+          data: {
+            id: 'user_identity_123',
+            userId: 'user_456',
+            properties: {
+              email: 'test@example.com'
+            },
+            aliases: {
+              created: ['testuser'],
+              failed: [
+                {
+                  alias: 'test@example.com',
+                  reason: 'Alias already exists'
+                }
+              ]
+            },
+            updatedAt: '2025-01-15T10:30:00.000Z'
+          },
+          requestId: 'req_123'
+        })
+      });
+
+      const clientWithMock = new EmitKit('test_key', {
+        fetch: mockFetch as any
+      });
+
+      const result = await clientWithMock.identity.identify({
+        user_id: 'user_456',
+        properties: { email: 'test@example.com' },
+        aliases: ['test@example.com', 'testuser']
+      });
+
+      expect(result.data.aliases.created).toHaveLength(1);
+      expect(result.data.aliases.failed).toHaveLength(1);
+      expect(result.data.aliases.failed[0].reason).toBe('Alias already exists');
+    });
+
+    it('should throw ValidationError on missing user_id', async () => {
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 400,
+        headers: new Map(),
+        json: async () => ({
+          error: 'Validation error',
+          details: [{ path: ['user_id'], message: 'User ID is required' }],
+          requestId: 'req_123'
+        })
+      });
+
+      const clientWithMock = new EmitKit('test_key', {
+        fetch: mockFetch as any
+      });
+
+      await expect(
+        clientWithMock.identity.identify({} as any)
+      ).rejects.toThrow(ValidationError);
+    });
+  });
 });

@@ -23,6 +23,9 @@ coverage/
 # Generated code
 packages/*/src/generated/
 
+# OpenAPI spec (fetched dynamically)
+openapi/
+
 # OS
 .DS_Store
 Thumbs.db

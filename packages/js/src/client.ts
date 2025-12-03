@@ -86,6 +86,43 @@ export class EmitKit {
   }
 
   /**
+   * Identity API
+   */
+  get identity() {
+    return {
+      /**
+       * Identify a user with properties and aliases
+       *
+       * @example
+       * ```ts
+       * const result = await client.identity.identify({
+       *   user_id: 'user_123',
+       *   properties: {
+       *     email: 'user@example.com',
+       *     name: 'John Doe',
+       *     plan: 'pro'
+       *   },
+       *   aliases: ['user@example.com', 'johndoe']
+       * });
+       * ```
+       */
+      identify: async (
+        data: any, // IdentifyUserRequest - will be typed after generation
+        options?: Omit<RequestOptions, 'idempotencyKey'>
+      ): Promise<EmitKitResponse<any>> => { // IdentifyUserResponse
+        return this.request('/v1/identify', {
+          method: 'POST',
+          body: JSON.stringify(data),
+          headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers
+          }
+        });
+      }
+    };
+  }
+
+  /**
    * Make a raw API request
    */
   private async request<T>(
