@@ -166,7 +166,7 @@ describe('EmitKit Client', () => {
     });
   });
 
-  describe('identity API', () => {
+  describe('identify', () => {
     it('should identify user with properties', async () => {
       const mockFetch = vi.fn().mockResolvedValue({
         ok: true,
@@ -197,7 +197,7 @@ describe('EmitKit Client', () => {
         fetch: mockFetch as any
       });
 
-      const result = await clientWithMock.identity.identify({
+      const result = await clientWithMock.identify({
         user_id: 'user_456',
         properties: {
           email: 'test@example.com',
@@ -240,7 +240,7 @@ describe('EmitKit Client', () => {
         fetch: mockFetch as any
       });
 
-      const result = await clientWithMock.identity.identify({
+      const result = await clientWithMock.identify({
         user_id: 'user_456',
         properties: {
           email: 'test@example.com',
@@ -289,7 +289,7 @@ describe('EmitKit Client', () => {
         fetch: mockFetch as any
       });
 
-      const result = await clientWithMock.identity.identify({
+      const result = await clientWithMock.identify({
         user_id: 'user_456',
         properties: { email: 'test@example.com' },
         aliases: ['test@example.com', 'testuser']
@@ -317,7 +317,7 @@ describe('EmitKit Client', () => {
       });
 
       await expect(
-        clientWithMock.identity.identify({} as any)
+        clientWithMock.identify({} as any)
       ).rejects.toThrow(ValidationError);
     });
   });

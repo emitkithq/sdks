@@ -44,6 +44,8 @@ console.log('Rate limit:', result.rateLimit);
 ## 📚 Features
 
 - ✅ **Type-Safe**: Full TypeScript support with auto-generated types
+- ✅ **User Identity**: Track users with custom properties and multiple aliases
+- ✅ **Alias Resolution**: Reference users by email, username, or any identifier
 - ✅ **Rate Limiting**: Automatic rate limit tracking and handling
 - ✅ **Idempotency**: Built-in idempotency key support for safe retries
 - ✅ **Error Handling**: Type-safe error classes (ValidationError, RateLimitError)
@@ -79,6 +81,80 @@ await client.events.create({
   userId: 'user_123',
   notify: true,
   displayAs: 'notification'
+});
+```
+
+### User Identity
+
+Identify users with custom properties and aliases:
+
+```typescript
+// Identify a user with properties
+const result = await client.identify({
+  user_id: 'user_123',
+  properties: {
+    email: 'john@example.com',
+    name: 'John Doe',
+    plan: 'pro',
+    signupDate: '2025-01-15'
+  }
+});
+
+console.log('Identity ID:', result.data.id);
+console.log('User ID:', result.data.userId);
+```
+
+### User Aliases
+
+Create aliases to reference users by multiple identifiers:
+
+```typescript
+// Identify user with aliases
+await client.identify({
+  user_id: 'user_123',
+  properties: {
+    email: 'john@example.com',
+    name: 'John Doe'
+  },
+  aliases: [
+    'john@example.com',      // Email
+    'johndoe',                // Username
+    'john.doe@company.com',   // Work email
+    'ext_12345'               // External system ID
+  ]
+});
+
+// Use aliases in events - they're automatically resolved!
+await client.events.create({
+  channelName: 'user-activity',
+  title: 'User Logged In',
+  userId: 'john@example.com',  // ← Alias works here!
+  metadata: { ip: '192.168.1.1' }
+});
+```
+
+### Update User Properties
+
+Properties are replaced on each identify call:
+
+```typescript
+// Initial identify
+await client.identify({
+  user_id: 'user_123',
+  properties: {
+    email: 'john@example.com',
+    plan: 'free'
+  }
+});
+
+// Update to pro plan (overwrites all properties)
+await client.identify({
+  user_id: 'user_123',
+  properties: {
+    email: 'john@example.com',
+    plan: 'pro',
+    upgradeDate: '2025-01-20'
+  }
 });
 ```
 
@@ -202,6 +278,44 @@ Create a new event.
   - `headers` (object): Additional headers
 
 **Returns:** `Promise<EmitKitResponse>`
+
+##### `identify(data, options?)`
+
+Identify a user with custom properties and aliases.
+
+**Parameters:**
+- `data`: Identity data object
+  - `user_id` (string, required): Your internal user ID
+  - `properties` (object, optional): Custom user properties (email, name, plan, etc.)
+  - `aliases` (string[], optional): Alternative identifiers (email, username, external IDs)
+
+- `options` (optional):
+  - `timeout` (number): Request timeout override
+  - `headers` (object): Additional headers
+
+**Returns:** `Promise<EmitKitResponse<IdentifyUserResponse>>`
+
+**Response:**
+```typescript
+{
+  data: {
+    id: string;              // Identity record ID
+    userId: string;          // User ID
+    properties: object;      // Stored properties
+    aliases: {
+      created: string[];     // Successfully created aliases
+      failed?: Array<{       // Failed aliases (if any)
+        alias: string;
+        reason: string;
+      }>;
+    };
+    updatedAt: string;       // ISO 8601 timestamp
+  };
+  rateLimit: RateLimitInfo;
+  requestId: string;
+  wasReplayed: boolean;
+}
+```
 
 ### Types
 
