@@ -1,0 +1,35 @@
+{
+  "name": "emitkit-sdks",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Official SDKs for EmitKit API - Auto-generated from OpenAPI specification",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/emitkit/emitkit-sdks.git"
+  },
+  "license": "MIT",
+  "scripts": {
+    "sync": "tsx scripts/sync-openapi.ts",
+    "generate": "tsx scripts/generate.ts",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean && rm -rf node_modules",
+    "dev": "turbo run dev --parallel",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "turbo run build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.27.1",
+    "tsx": "^4.20.6",
+    "turbo": "^2.4.1",
+    "typescript": "^5.3.3",
+    "vitest": "^2.1.8"
+  },
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

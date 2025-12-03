@@ -1,0 +1,43 @@
+version: 2
+updates:
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Root dependencies
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@changesets/*"
+          - "tsx"
+          - "turbo"
+          - "typescript"
+          - "vitest"
+
+  # JavaScript SDK
+  - package-ecosystem: "npm"
+    directory: "/packages/js"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "sdk-js"
+    groups:
+      dev-dependencies:
+        patterns:
+          - "@hey-api/*"
+          - "@types/*"
+          - "tsup"
+          - "typescript"
+          - "vitest"
