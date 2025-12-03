@@ -17,7 +17,6 @@ const SDK_PACKAGES = [
     path: 'packages/js',
     command: 'pnpm run generate'
   }
-  // Future: Add Python, Go, etc.
 ];
 
 async function generateSDKs() {

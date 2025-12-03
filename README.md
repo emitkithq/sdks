@@ -10,9 +10,6 @@ Official SDKs for the EmitKit API - Real-time event tracking and notifications
 | Language | Package | Version | Documentation |
 |----------|---------|---------|---------------|
 | **TypeScript/JavaScript** | [`@emitkit/js`](./packages/js) | [![npm](https://img.shields.io/npm/v/@emitkit/js)](https://www.npmjs.com/package/@emitkit/js) | [Docs](./packages/js/README.md) |
-| Python | `emitkit` | Coming Soon | - |
-| Go | `github.com/emitkit/go-sdk` | Coming Soon | - |
-| Ruby | `emitkit` | Coming Soon | - |
 
 ## 🚀 Quick Start
 
@@ -48,7 +45,7 @@ This is a **monorepo** containing multiple SDK packages, all auto-generated from
 emitkit-sdks/
 ├── packages/
 │   ├── js/          # TypeScript/JavaScript SDK
-│   └── ...          # Future SDKs (Python, Go, Ruby)
+│   └── ...          # Future SDKs
 ├── scripts/         # Automation scripts
 └── openapi/         # Synced OpenAPI spec
 ```
