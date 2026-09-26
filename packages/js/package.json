@@ -1,7 +1,27 @@
 {
   "name": "@emitkit/js",
   "version": "2.1.1",
-  "description": "Official TypeScript/JavaScript SDK for EmitKit API",
+  "description": "The EmitKit SDK: send events, ask people for decisions from their phone, and read the answers.",
+  "keywords": [
+    "emitkit",
+    "events",
+    "push notifications",
+    "human in the loop",
+    "approvals",
+    "agents",
+    "sdk"
+  ],
+  "homepage": "https://emitkit.com/docs/sdk",
+  "bugs": {
+    "url": "https://github.com/emitkithq/sdks/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emitkithq/sdks.git",
+    "directory": "packages/js"
+  },
+  "license": "MIT",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
@@ -21,41 +41,26 @@
   "files": [
     "dist",
     "README.md",
+    "MIGRATING.md",
     "LICENSE"
   ],
+  "engines": {
+    "node": ">=20.3"
+  },
   "scripts": {
-    "generate": "openapi-ts",
-    "build": "pnpm run generate && tsup",
+    "generate": "openapi-typescript ../../openapi/openapi.json --default-non-nullable false -o src/generated/openapi.ts",
+    "build": "tsup",
     "dev": "tsup --watch",
-    "test": "vitest run",
-    "test:watch": "vitest",
+    "test": "vitest run --dir test",
+    "test:e2e": "vitest run --dir e2e",
     "lint": "tsc --noEmit",
-    "clean": "rm -rf dist .turbo node_modules src/generated",
-    "prepublishOnly": "pnpm run build && pnpm run test"
+    "clean": "rm -rf dist .turbo node_modules",
+    "prepublishOnly": "pnpm run build"
   },
-  "keywords": [
-    "emitkit",
-    "events",
-    "notifications",
-    "api",
-    "sdk",
-    "typescript",
-    "javascript",
-    "real-time"
-  ],
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/emitkithq/sdks.git",
-    "directory": "packages/js"
-  },
-  "bugs": {
-    "url": "https://github.com/emitkit/emitkit-sdks/issues"
-  },
-  "homepage": "https://emitkit.com",
-  "license": "MIT",
   "devDependencies": {
-    "@hey-api/openapi-ts": "^0.88.0",
     "@types/node": "^22.10.2",
+    "openapi-typescript": "^7.13.0",
+    "standardwebhooks": "1.1.1",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"

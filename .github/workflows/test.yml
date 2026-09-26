@@ -36,9 +36,3 @@ jobs:
       - name: Build packages
         run: pnpm run build
 
-      - name: Upload coverage
-        if: github.event_name == 'pull_request'
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          fail_ci_if_error: false

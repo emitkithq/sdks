@@ -21,7 +21,6 @@ coverage/
 .env.*.local
 
 # Generated code
-packages/*/src/generated/
 
 # OpenAPI spec (fetched dynamically)
 openapi/

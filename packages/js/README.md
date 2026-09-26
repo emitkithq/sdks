@@ -1,410 +1,202 @@
 # @emitkit/js
 
-Official TypeScript/JavaScript SDK for EmitKit API
-
-[![npm version](https://img.shields.io/npm/v/@emitkit/js.svg)](https://www.npmjs.com/package/@emitkit/js)
-[![Bundle Size](https://img.shields.io/bundlephobia/minzip/@emitkit/js)](https://bundlephobia.com/package/@emitkit/js)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
-## 📦 Installation
+The EmitKit SDK for TypeScript and JavaScript. Send events to your phone, ask
+a person for a decision and get the answer back, list what happened, and
+verify callbacks. No dependencies; runs on Node 20.3+, Bun, Deno, Cloudflare
+Workers and anything else with `fetch`.
 
 ```bash
 npm install @emitkit/js
-# or
-pnpm add @emitkit/js
-# or
-yarn add @emitkit/js
 ```
 
-## 🚀 Quick Start
+```ts
+import { EmitKit } from "@emitkit/js";
 
-```typescript
-import { EmitKit } from '@emitkit/js';
+const emitkit = new EmitKit(); // reads EMITKIT_API_KEY
 
-// Initialize the client
-const client = new EmitKit('emitkit_xxxxxxxxxxxxxxxxxxxxx');
+await emitkit.events.create({
+  channelName: "payments",
+  title: "New subscription",
+  icon: "💰",
+  metadata: { amount: 49, currency: "USD", plan: "pro" },
+});
+```
 
-// Create an event
-const result = await client.events.create({
-  channelName: 'payments',
-  title: 'Payment Received',
-  description: 'User upgraded to Pro plan',
-  icon: '💰',
-  metadata: {
-    amount: 99.99,
-    currency: 'USD',
-    plan: 'pro'
+Create an API key in EmitKit under **Settings → API keys**. Pass it as
+`new EmitKit("emitkit_…")`, or set `EMITKIT_API_KEY`. Keys are for servers:
+never ship one in a browser or mobile app.
+
+## Ask for a decision
+
+An event with buttons (actions with an `id`) or fields waits for an answer.
+The people subscribed to its channel get a push; the first to answer decides.
+
+```ts
+const { answer } = await emitkit.ask({
+  channelName: "refunds",
+  title: "Refund Jane Cooper $240 for order #1042?",
+  description: "Arrived damaged: 2 of 3 items broken.",
+  fields: [
+    {
+      id: "resolution",
+      type: "choice",
+      label: "Resolution",
+      options: [
+        { id: "full", label: "Full refund ($240)" },
+        { id: "partial", label: "Broken items only ($160)" },
+      ],
+    },
+  ],
+  actions: [
+    { id: "approve", label: "Refund", style: "primary" },
+    { id: "deny", label: "Don't refund", style: "destructive" },
+    { label: "Open order", url: "https://shop.example.com/orders/1042" },
+  ],
+  expiresIn: 1800,
+});
+
+if (answer.status === "answered" && answer.action === "approve") {
+  await refund(1042, answer.values?.resolution);
+}
+// Anything else (deny, expired, canceled) is a no.
+```
+
+`ask` sends the event, then checks every 3 seconds until it's answered,
+expires or is canceled, and returns the event with its `answer`. Pass
+`{ timeout }` (ms) to stop waiting earlier (the answer is then still
+`pending`), or a `signal` to abort. A network retry never asks twice, and a
+spent rate limit during the wait is waited out.
+
+Field types: `choice` (with `multiple` for checkboxes), `text`, `number`,
+`boolean`. `answer.values` holds each field's value by its `id`.
+
+### Serverless: get a callback instead
+
+`ask` suits a script, a CLI or an agent session. A serverless function can't
+wait for hours, so send `callbackUrl` and let EmitKit call you, with your own
+state in `resume`:
+
+```ts
+await emitkit.events.create({
+  channelName: "refunds",
+  title: "Refund Jane $240?",
+  actions: [
+    { id: "approve", label: "Refund" },
+    { id: "deny", label: "Don't" },
+  ],
+  callbackUrl: "https://shop.example.com/api/emitkit",
+  resume: JSON.stringify({ orderId: 1042 }),
+});
+```
+
+```ts
+// app/api/emitkit/route.ts
+import { verifyCallback } from "@emitkit/js";
+
+export const POST = async (request: Request) => {
+  // EMITKIT_CALLBACK_SECRET: the project's signing secret (whsec_…), Settings → API keys.
+  const callback = await verifyCallback(request);
+  if (callback.type === "event.answered" && callback.answer.action === "approve") {
+    const { orderId } = JSON.parse(callback.resume ?? "{}");
+    await refund(orderId);
   }
-});
-
-console.log('Event created:', result.data.id);
-console.log('Rate limit:', result.rateLimit);
+  return new Response(null, { status: 204 });
+};
 ```
 
-## 📚 Features
+`verifyCallback` checks the Standard Webhooks signature and timestamp, and
+throws `EmitKitError` with code `invalid_signature` when it doesn't check
+out. Callbacks can arrive more than once: `webhook-id` stays the same, so
+drop repeats.
 
-- ✅ **Type-Safe**: Full TypeScript support with auto-generated types
-- ✅ **User Identity**: Track users with custom properties and multiple aliases
-- ✅ **Alias Resolution**: Reference users by email, username, or any identifier
-- ✅ **Rate Limiting**: Automatic rate limit tracking and handling
-- ✅ **Idempotency**: Built-in idempotency key support for safe retries
-- ✅ **Error Handling**: Type-safe error classes (ValidationError, RateLimitError)
-- ✅ **Zero Dependencies**: No external runtime dependencies
-- ✅ **Tree-Shakeable**: Optimized bundle size with ES modules
-- ✅ **Request IDs**: Automatic request ID tracking for debugging
+## Everything else
 
-## 🎯 Usage
+```ts
+const event = await emitkit.events.get("event_…"); // with its answer
+await emitkit.events.cancel("event_…"); // stop a question from waiting
 
-### Basic Event Creation
+const page = await emitkit.events.list({ channel: "payments", limit: 20 });
+const next = await emitkit.events.list({ before: page.nextCursor ?? undefined });
 
-```typescript
-const result = await client.events.create({
-  channelName: 'general',
-  title: 'Test Event',
-  description: 'This is a test event',
-  icon: '📝'
+const channels = await emitkit.channels.list();
+
+await emitkit.identify({
+  userId: "user_123",
+  properties: { email: "jane@example.com", plan: "pro" },
+  aliases: ["jane@example.com"],
 });
+await emitkit.identities.delete("user_123"); // erasure requests
+
+const me = await emitkit.me(); // organization, project, scopes
 ```
 
-### With Metadata
+Every method returns the data (`Event`, `EventPage`, `Channel[]`, …).
+`emitkit.lastResponse` holds the last response's `requestId`, `rateLimit` and
+whether it was an idempotent `replayed` result.
 
-```typescript
-await client.events.create({
-  channelName: 'user-signups',
-  title: 'New User Registered',
-  tags: ['signup', 'onboarding'],
-  metadata: {
-    email: 'user@example.com',
-    plan: 'free',
-    source: 'organic'
-  },
-  userId: 'user_123',
-  notify: true,
-  displayAs: 'notification'
-});
+## Idempotency and retries
+
+`events.create` sends an `Idempotency-Key`, so the SDK's own retries never
+create a second event. Pass yours to make your retries safe too:
+
+```ts
+await emitkit.events.create(input, { idempotencyKey: `order-${order.id}` });
 ```
 
-### User Identity
+Requests that are safe to repeat are retried twice after a network error, a
+timeout, a 5xx or a short `429` (a rate-limit wait over 10 seconds is
+returned to you instead).
 
-Identify users with custom properties and aliases:
+## Errors
 
-```typescript
-// Identify a user with properties
-const result = await client.identify({
-  user_id: 'user_123',
-  properties: {
-    email: 'john@example.com',
-    name: 'John Doe',
-    plan: 'pro',
-    signupDate: '2025-01-15'
-  }
-});
+Every error is an `EmitKitError`. Switch on `code`:
 
-console.log('Identity ID:', result.data.id);
-console.log('User ID:', result.data.userId);
-```
-
-### User Aliases
-
-Create aliases to reference users by multiple identifiers:
-
-```typescript
-// Identify user with aliases
-await client.identify({
-  user_id: 'user_123',
-  properties: {
-    email: 'john@example.com',
-    name: 'John Doe'
-  },
-  aliases: [
-    'john@example.com',      // Email
-    'johndoe',                // Username
-    'john.doe@company.com',   // Work email
-    'ext_12345'               // External system ID
-  ]
-});
-
-// Use aliases in events - they're automatically resolved!
-await client.events.create({
-  channelName: 'user-activity',
-  title: 'User Logged In',
-  userId: 'john@example.com',  // ← Alias works here!
-  metadata: { ip: '192.168.1.1' }
-});
-```
-
-### Update User Properties
-
-Properties are replaced on each identify call:
-
-```typescript
-// Initial identify
-await client.identify({
-  user_id: 'user_123',
-  properties: {
-    email: 'john@example.com',
-    plan: 'free'
-  }
-});
-
-// Update to pro plan (overwrites all properties)
-await client.identify({
-  user_id: 'user_123',
-  properties: {
-    email: 'john@example.com',
-    plan: 'pro',
-    upgradeDate: '2025-01-20'
-  }
-});
-```
-
-### Idempotency
-
-Safe retries for webhooks and payment processing:
-
-```typescript
-const result = await client.events.create(
-  {
-    channelName: 'payments',
-    title: 'Payment Received',
-    metadata: { paymentId: 'pay_123' }
-  },
-  { idempotencyKey: 'payment-pay_123-webhook' }
-);
-
-// Subsequent requests with the same key return cached response
-console.log('Was replayed:', result.wasReplayed);
-```
-
-### Rate Limit Tracking
-
-```typescript
-const result = await client.events.create({...});
-
-// Check rate limit status
-console.log(result.rateLimit);
-// {
-//   limit: 100,
-//   remaining: 95,
-//   reset: 1733270400,
-//   resetIn: 45000
-// }
-
-// Access last known rate limit
-console.log(client.rateLimit);
-```
-
-### Error Handling
-
-```typescript
-import {
-  EmitKit,
-  EmitKitError,
-  RateLimitError,
-  ValidationError
-} from '@emitkit/js';
+```ts
+import { EmitKitError } from "@emitkit/js";
 
 try {
-  await client.events.create({...});
+  await emitkit.events.create(input);
 } catch (error) {
-  if (error instanceof RateLimitError) {
-    console.log('Rate limit exceeded!');
-    console.log(`Retry in ${error.rateLimit.resetIn}ms`);
-  } else if (error instanceof ValidationError) {
-    console.log('Validation failed:');
-    error.validationErrors.forEach(err => {
-      console.log(`- ${err.path.join('.')}: ${err.message}`);
-    });
-  } else if (error instanceof EmitKitError) {
-    console.log(`API Error ${error.statusCode}:`, error.message);
-    console.log('Request ID:', error.requestId);
+  if (error instanceof EmitKitError && error.code === "validation_error") {
+    console.log(error.details); // [{ path: ["fields", 0, "options"], message: "…" }]
   }
+  throw error;
 }
 ```
 
-## ⚙️ Configuration
+| `code` | Means |
+| --- | --- |
+| `validation_error` | The request doesn't match; `details` names each problem and its fix |
+| `unauthorized` | The key is missing or wrong |
+| `forbidden` | The key can't do this (read-only keys only read) or its project is gone |
+| `not_found` | No such event or identity |
+| `idempotency_conflict` | The idempotency key was used with a different request |
+| `not_pending`, `not_waiting` | Cancel on an answered event, or one that never asked |
+| `payload_too_large` | Over 16 KB per event |
+| `rate_limited` | Over 100 requests a minute; `retryAfter` says how long to wait |
+| `internal_error` | Something failed on EmitKit's side |
+| `network_error`, `timeout` | No response |
+| `http_<status>` | A response that wasn't EmitKit's (a proxy's error page, say) |
+| `missing_api_key` | No key passed and no `EMITKIT_API_KEY` |
+| `invalid_signature` | `verifyCallback` rejected the callback |
 
-```typescript
-const client = new EmitKit('emitkit_xxxxxxxxxxxxxxxxxxxxx', {
-  // Custom base URL (default: 'https://api.emitkit.com')
-  baseUrl: 'https://api.your-domain.com',
+`status` and `requestId` are on the error too; quote the request id when you
+contact support.
 
-  // Request timeout in milliseconds (default: 30000)
-  timeout: 60000,
+## Options
 
-  // Custom fetch implementation
-  fetch: customFetch
+```ts
+new EmitKit({
+  apiKey: "emitkit_…", // default: EMITKIT_API_KEY
+  baseUrl: "https://api.emitkit.com", // default: EMITKIT_BASE_URL, for self-hosting
+  timeout: 30_000, // per request, ms
+  maxRetries: 2,
+  fetch, // your own fetch
 });
 ```
 
-## 📖 API Reference
+Upgrading from 2.x? See [MIGRATING.md](./MIGRATING.md).
 
-### `EmitKit`
+## License
 
-Main client class for interacting with the EmitKit API.
-
-#### Constructor
-
-```typescript
-new EmitKit(apiKey: string, config?: Partial<EmitKitConfig>)
-```
-
-#### Properties
-
-- `rateLimit`: Get the last known rate limit information
-
-#### Methods
-
-##### `events.create(data, options?)`
-
-Create a new event.
-
-**Parameters:**
-- `data`: Event data object
-  - `channelName` (string, required): Channel name (auto-creates if doesn't exist)
-  - `title` (string, required): Event title
-  - `description` (string, optional): Event description
-  - `icon` (string, optional): Single emoji icon
-  - `tags` (string[], optional): Array of tags
-  - `metadata` (object, optional): Custom JSON metadata
-  - `userId` (string | null, optional): User identifier
-  - `notify` (boolean, optional): Send notification (default: true)
-  - `displayAs` ('message' | 'notification', optional): Display style
-  - `source` (string, optional): Source identifier
-
-- `options` (optional):
-  - `idempotencyKey` (string): Idempotency key for safe retries
-  - `timeout` (number): Request timeout override
-  - `headers` (object): Additional headers
-
-**Returns:** `Promise<EmitKitResponse>`
-
-##### `identify(data, options?)`
-
-Identify a user with custom properties and aliases.
-
-**Parameters:**
-- `data`: Identity data object
-  - `user_id` (string, required): Your internal user ID
-  - `properties` (object, optional): Custom user properties (email, name, plan, etc.)
-  - `aliases` (string[], optional): Alternative identifiers (email, username, external IDs)
-
-- `options` (optional):
-  - `timeout` (number): Request timeout override
-  - `headers` (object): Additional headers
-
-**Returns:** `Promise<EmitKitResponse<IdentifyUserResponse>>`
-
-**Response:**
-```typescript
-{
-  data: {
-    id: string;              // Identity record ID
-    userId: string;          // User ID
-    properties: object;      // Stored properties
-    aliases: {
-      created: string[];     // Successfully created aliases
-      failed?: Array<{       // Failed aliases (if any)
-        alias: string;
-        reason: string;
-      }>;
-    };
-    updatedAt: string;       // ISO 8601 timestamp
-  };
-  rateLimit: RateLimitInfo;
-  requestId: string;
-  wasReplayed: boolean;
-}
-```
-
-### Types
-
-#### `EmitKitResponse<T>`
-
-```typescript
-{
-  data: T;                    // Response data
-  rateLimit: RateLimitInfo;   // Rate limit info
-  requestId: string;          // Request ID for debugging
-  wasReplayed: boolean;       // Idempotent replay flag
-}
-```
-
-#### `RateLimitInfo`
-
-```typescript
-{
-  limit: number;      // Max requests allowed
-  remaining: number;  // Remaining requests
-  reset: number;      // Unix timestamp when limit resets
-  resetIn: number;    // Milliseconds until reset
-}
-```
-
-### Error Classes
-
-#### `EmitKitError`
-
-Base error class for all SDK errors.
-
-**Properties:**
-- `message`: Error message
-- `statusCode`: HTTP status code
-- `requestId`: Request ID for debugging
-- `details`: Additional error details
-
-#### `RateLimitError`
-
-Thrown when rate limit is exceeded (HTTP 429).
-
-**Properties:**
-- All `EmitKitError` properties
-- `rateLimit`: Rate limit information
-
-#### `ValidationError`
-
-Thrown when request validation fails (HTTP 400).
-
-**Properties:**
-- All `EmitKitError` properties
-- `validationErrors`: Array of validation error details
-
-## 🧪 Testing
-
-```bash
-# Run tests
-pnpm test
-
-# Watch mode
-pnpm test:watch
-
-# Coverage
-pnpm test --coverage
-```
-
-## 📝 Examples
-
-See the [examples](./examples) directory for more usage examples:
-
-- [Basic Usage](./examples/basic.ts)
-- [Idempotency](./examples/idempotency.ts)
-- [Error Handling](./examples/error-handling.ts)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](../../CONTRIBUTING.md).
-
-## 📄 License
-
-MIT License - see [LICENSE](../../LICENSE) for details
-
-## 🔗 Links
-
-- [EmitKit Documentation](https://emitkit.com/docs)
-- [API Reference](https://api.emitkit.com/api/docs)
-- [GitHub Repository](https://github.com/emitkit/emitkit-sdks)
-- [Report Issues](https://github.com/emitkit/emitkit-sdks/issues)
-
----
-
-**Note**: This SDK is automatically generated from the OpenAPI specification.
+MIT

@@ -1,41 +1,21 @@
 /**
- * EmitKit JavaScript/TypeScript SDK
+ * The EmitKit SDK: send events, ask people for decisions and read the
+ * answers, list events and channels, identify your users, and verify
+ * callbacks.
  *
- * Official SDK for the EmitKit API - Real-time event tracking and notifications
+ * ```ts
+ * import { EmitKit } from "@emitkit/js";
  *
- * @example
- * ```typescript
- * import { EmitKit } from '@emitkit/js';
- *
- * const client = new EmitKit('emitkit_xxxxxxxxxxxxxxxxxxxxx');
- *
- * await client.events.create({
- *   channelName: 'payments',
- *   title: 'Payment Received',
- *   metadata: { amount: 99.99 }
- * });
+ * const emitkit = new EmitKit(); // reads EMITKIT_API_KEY
+ * await emitkit.events.create({ channelName: "payments", title: "New subscription" });
  * ```
  *
  * @packageDocumentation
  */
 
-// Main client
-export { EmitKit } from './client';
-
-// Types and errors
-export type {
-  EmitKitConfig,
-  RateLimitInfo,
-  RequestOptions,
-  EmitKitResponse
-} from './types';
-
-export {
-  EmitKitError,
-  RateLimitError,
-  ValidationError
-} from './types';
-
-// Re-export generated types
-// Note: These will be available after running `pnpm run generate`
-// export type * from './generated/types';
+export { verifyCallback } from "./callbacks";
+export type { VerifyCallbackOptions } from "./callbacks";
+export { EmitKit } from "./client";
+export type { AskOptions, Asked, CreateOptions, EmitKitOptions } from "./client";
+export { EmitKitError } from "./errors";
+export type * from "./types";
