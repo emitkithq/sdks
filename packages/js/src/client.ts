@@ -126,8 +126,12 @@ export class EmitKit {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), this.config.timeout);
 
+    // Called unbound: Cloudflare Workers reject fetch invoked as a method of
+    // another object ("Illegal invocation").
+    const { fetch: send } = this.config;
+
     try {
-      const response = await this.config.fetch(url, {
+      const response = await send(url, {
         ...options,
         headers: {
           Authorization: `Bearer ${this.config.apiKey}`,

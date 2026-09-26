@@ -25,6 +25,41 @@ describe('EmitKit Client', () => {
     });
   });
 
+  describe('fetch receiver', () => {
+    // Cloudflare Workers throw "Illegal invocation" when fetch is called as a
+    // method of any object other than the global scope.
+    const workerdFetch = vi.fn(function (this: unknown) {
+      if (this !== undefined && this !== globalThis) {
+        throw new TypeError('Illegal invocation');
+      }
+      return Promise.resolve({
+        ok: true,
+        headers: new Map(),
+        json: async () => ({ success: true, data: { id: 'evt_1' }, requestId: 'req_1' })
+      });
+    });
+
+    it('calls the global fetch without rebinding it', async () => {
+      vi.stubGlobal('fetch', workerdFetch);
+      try {
+        const result = await new EmitKit('test_key').events.create({
+          channelName: 'test',
+          title: 'Test'
+        });
+        expect(result.data.id).toBe('evt_1');
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    });
+
+    it('calls a fetch passed in config without rebinding it', async () => {
+      const result = await new EmitKit('test_key', {
+        fetch: workerdFetch as unknown as typeof fetch
+      }).events.create({ channelName: 'test', title: 'Test' });
+      expect(result.data.id).toBe('evt_1');
+    });
+  });
+
   describe('rate limit tracking', () => {
     it('should return undefined rate limit initially', () => {
       expect(client.rateLimit).toBeUndefined();
