@@ -1,13 +1,11 @@
-import { defineConfig } from 'vitest/config';
+import { readFileSync } from "node:fs";
+import { defineConfig } from "vitest/config";
+
+const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
+  version: string;
+};
 
 export default defineConfig({
-  test: {
-    globals: true,
-    environment: 'node',
-    coverage: {
-      provider: 'v8',
-      reporter: ['text', 'json', 'html'],
-      exclude: ['src/generated/**', '**/*.test.ts', '**/examples/**']
-    }
-  }
+  define: { __VERSION__: JSON.stringify(version) },
+  test: { environment: "node", testTimeout: 60_000 },
 });

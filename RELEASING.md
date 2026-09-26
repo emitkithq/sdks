@@ -1,249 +1,49 @@
-# Release Guide
+# Releasing
 
-This guide explains how to release new versions of the EmitKit SDKs.
+Releases go through [Changesets](https://github.com/changesets/changesets)
+and npm trusted publishing: no npm token anywhere.
 
-## Prerequisites
+1. With your change, add a changeset: `pnpm changeset` (patch, minor or major,
+   and a sentence for the changelog). Commit it with the change.
+2. Merging to `main` makes the Release workflow open (or update) the
+   "chore: release packages" PR, with the versions and changelogs.
+3. Merging that PR publishes to npm from GitHub Actions, with provenance.
 
-1. **npm trusted publishing**: each package on npm trusts this repository's `release.yml` workflow (package settings → Trusted publisher → GitHub Actions: `emitkithq` / `sdks` / `release.yml`, or `npm trust github @emitkit/js --file release.yml --repo emitkithq/sdks --allow-publish`). The workflow publishes with a short-lived OIDC token and provenance; there is no npm token secret.
-2. **GitHub Actions may create pull requests**: Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests", so the built-in `GITHUB_TOKEN` can open the release PR. There is no PAT secret.
-3. **GitHub Permissions**: Write access to the repository
+Each package trusts `release.yml` on npm (package settings → Trusted
+publisher → GitHub Actions: `emitkithq` / `sdks` / `release.yml`), and
+Actions may open PRs (Settings → Actions → General).
 
-## Release Process (Automated with Changesets)
+## Prereleases (now: `next`)
 
-### 1. Make Changes
+The repository is in Changesets pre mode with the `next` tag
+(`.changeset/pre.json`), so releases publish as `3.0.0-next.N` under the
+`next` dist-tag and `latest` stays where it is. Try one with
+`npm install @emitkit/js@next`.
 
-Make your changes to the SDK (e.g., update client wrapper, fix bugs, add features).
+To release 3.0.0 as `latest`: `pnpm changeset pre exit`, commit, merge, then
+merge the release PR.
 
-### 2. Create a Changeset
+## The CLI's first publish
 
-When you're ready to release, create a changeset describing your changes:
-
-```bash
-pnpm changeset
-```
-
-This will prompt you to:
-1. Select which packages to bump (e.g., `@emitkit/js`)
-2. Choose the version bump type:
-   - **patch** (0.0.X) - Bug fixes, minor updates
-   - **minor** (0.X.0) - New features, backward compatible
-   - **major** (X.0.0) - Breaking changes
-3. Write a summary of the changes
-
-The changeset will be saved in `.changeset/` directory.
-
-### 3. Commit and Push
+`@emitkit/cli` doesn't exist on npm yet, and trusted publishing can only be
+set up for a package that exists. It is `"private": true` until then, so
+releases skip it. Once, by hand:
 
 ```bash
-git add .
-git commit -m "feat: add new SDK features"
-git push origin main
+pnpm install && pnpm build
+cd packages/cli
+# remove "private": true from package.json, then:
+npm publish --access public --tag next      # asks for your 2FA code
+npm trust github @emitkit/cli --file release.yml --repo emitkithq/sdks --allow-publish
 ```
 
-### 4. Automated Release
+Commit the removed `"private": true`; from then on the CLI releases like the SDK.
 
-When changes are pushed to `main`:
+## Syncing the API
 
-1. **GitHub Actions** runs the release workflow
-2. **Changesets** creates a "Release" pull request with:
-   - Updated package versions
-   - Generated CHANGELOG.md
-   - All pending changesets applied
-3. **Review the PR** - Check the version bumps and changelog
-4. **Merge the PR** - This triggers the actual publish to npm
-
-### 5. Verify Release
-
-After the PR is merged:
-
-1. Check npm: https://www.npmjs.com/package/@emitkit/js
-2. Check GitHub Releases: https://github.com/emitkithq/sdks/releases
-
-## Manual Release (Fallback)
-
-If you need to release manually:
-
-### 1. Version Packages
-
-```bash
-# Apply changesets and update versions
-pnpm changeset version
-```
-
-This updates `package.json` versions and generates CHANGELOGs.
-
-### 2. Build and Test
-
-```bash
-# Sync latest OpenAPI spec
-pnpm run sync
-
-# Generate SDKs
-pnpm run generate
-
-# Run tests
-pnpm run test
-
-# Build packages
-pnpm run build
-```
-
-### 3. Publish to npm
-
-```bash
-# Make sure you're logged in
-npm login
-
-# Publish all packages
-pnpm run release
-```
-
-### 4. Create Git Tag
-
-```bash
-git tag @emitkit/js@1.0.1
-git push --tags
-```
-
-## Version Guidelines
-
-### Patch (0.0.X)
-
-- Bug fixes
-- Documentation updates
-- Performance improvements
-- Internal refactoring
-
-Example changeset:
-```bash
-pnpm changeset
-# Select: @emitkit/js
-# Type: patch
-# Summary: Fix rate limit header parsing
-```
-
-### Minor (0.X.0)
-
-- New features (backward compatible)
-- New API endpoints added
-- Enhanced functionality
-
-Example changeset:
-```bash
-pnpm changeset
-# Select: @emitkit/js
-# Type: minor
-# Summary: Add webhook signature verification
-```
-
-### Major (X.0.0)
-
-- Breaking changes
-- API redesign
-- Removed/renamed public APIs
-
-Example changeset:
-```bash
-pnpm changeset
-# Select: @emitkit/js
-# Type: major
-# Summary: BREAKING: Rename EmitKit to EmitKitClient
-```
-
-## OpenAPI Spec Updates
-
-When the OpenAPI spec is updated:
-
-### Automatic (Recommended)
-
-The daily sync workflow automatically:
-1. Fetches the latest spec at midnight UTC
-2. Regenerates SDKs
-3. Creates a PR if changes detected
-
-### Manual
-
-```bash
-# Sync from production
-pnpm run sync
-
-# Or from development
-ENV=development pnpm run sync
-
-# Regenerate SDKs
-pnpm run generate
-
-# Create changeset
-pnpm changeset
-# Type: patch (if just types updated) or minor (if new endpoints)
-# Summary: Update OpenAPI spec to v2.1.0
-
-# Commit and push
-git add .
-git commit -m "chore: sync OpenAPI spec"
-git push
-```
-
-## Troubleshooting
-
-### "npm ERR! 403 Forbidden"
-
-You don't have publish access. Contact the package maintainer.
-
-### "Version already exists"
-
-The version is already published. Bump the version in `package.json` or create a new changeset.
-
-### Tests Failing
-
-Don't publish if tests fail. Fix the issues first:
-
-```bash
-pnpm run test
-pnpm run lint
-```
-
-### OpenAPI Sync Fails
-
-Check if the API endpoint is accessible:
-
-```bash
-curl https://api.emitkit.com/api/openapi.json
-```
-
-## Release Checklist
-
-Before merging a release PR:
-
-- [ ] Version bumps are correct
-- [ ] CHANGELOG.md is accurate
-- [ ] All tests pass
-- [ ] Build succeeds
-- [ ] Documentation is updated (if needed)
-- [ ] Breaking changes are clearly documented
-
-## Post-Release
-
-After a successful release:
-
-1. **Announce** - Share the release in relevant channels
-2. **Update Docs** - If using external docs (like Mintlify), they should auto-update
-3. **Monitor** - Check npm download stats and GitHub issues for problems
-4. **Test** - Verify the published package works:
-
-```bash
-# Create a test project
-mkdir test-@emitkit/js
-cd test-@emitkit/js
-npm init -y
-npm install @emitkit/js
-
-# Test the import
-node -e "const { EmitKit } = require('@emitkit/js'); console.log('SDK loaded successfully');"
-```
-
-## References
-
-- [Changesets Documentation](https://github.com/changesets/changesets)
-- [Semantic Versioning](https://semver.org/)
-- [npm Publishing Guide](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry)
+`pnpm sync` fetches `https://api.emitkit.com/openapi.json`
+(`EMITKIT_OPENAPI_URL` for another EmitKit), and `pnpm generate` regenerates
+`packages/js/src/generated/openapi.ts`. The Sync workflow does both daily and
+opens a PR when the document changed. If `pnpm lint` fails on
+`src/contract.ts`, update `packages/js/src/types.ts` to match, and add a
+changeset.

@@ -1,131 +1,54 @@
 # EmitKit SDKs
 
-Official SDKs for the EmitKit API - Real-time event tracking and notifications
+The official EmitKit SDK and CLI. MIT licensed.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CI Status](https://github.com/emitkit/emitkit-sdks/workflows/Test/badge.svg)](https://github.com/emitkit/emitkit-sdks/actions)
+| Package | What it is |
+| --- | --- |
+| [`@emitkit/js`](./packages/js) | The TypeScript/JavaScript SDK: send events, ask people for decisions and get the answer, list events and channels, verify callbacks. No dependencies. |
+| [`@emitkit/cli`](./packages/cli) | `emitkit` in your terminal, built on the SDK: `send`, `ask --timeout`, `events`, `tail`, `channels`, `identify`. |
 
-## 📦 Available SDKs
+```ts
+import { EmitKit } from "@emitkit/js";
 
-| Language | Package | Version | Documentation |
-|----------|---------|---------|---------------|
-| **TypeScript/JavaScript** | [`@emitkit/js`](./packages/js) | [![npm](https://img.shields.io/npm/v/@emitkit/js)](https://www.npmjs.com/package/@emitkit/js) | [Docs](./packages/js/README.md) |
-
-## 🚀 Quick Start
-
-### JavaScript/TypeScript
-
-```bash
-npm install @emitkit/js
-# or
-pnpm add @emitkit/js
-# or
-yarn add @emitkit/js
-```
-
-```typescript
-import { EmitKit } from '@emitkit/js';
-
-const client = new EmitKit('emitkit_xxxxxxxxxxxxxxxxxxxxx');
-
-await client.events.create({
-  channelName: 'payments',
-  title: 'Payment Received',
-  metadata: { amount: 99.99 }
+const emitkit = new EmitKit(); // reads EMITKIT_API_KEY
+const { answer } = await emitkit.ask({
+  channelName: "deploys",
+  title: "Ship v1.2.3 to production?",
+  actions: [
+    { id: "ship", label: "Ship", style: "primary" },
+    { id: "hold", label: "Not yet" },
+  ],
 });
 ```
 
-## 🏗️ Architecture
+Docs: [emitkit.com/docs](https://emitkit.com/docs). API reference:
+[openapi.json](https://api.emitkit.com/openapi.json).
 
-This is a **monorepo** containing multiple SDK packages, all auto-generated from the [EmitKit OpenAPI specification](https://api.emitkit.com/api/openapi.json).
-
-### Structure
-
-```
-@emitkit/jss/
-├── packages/
-│   ├── js/          # TypeScript/JavaScript SDK
-│   └── ...          # Future SDKs
-├── scripts/         # Automation scripts
-└── openapi/         # Synced OpenAPI spec
-```
-
-### Automation
-
-- **Daily Sync**: OpenAPI spec is automatically synced from production API
-- **Auto-Generation**: SDKs are regenerated when the spec changes
-- **Auto-Publishing**: New versions are published to npm on release tags
-- **CI/CD**: Tests run on all pull requests
-
-## 🛠️ Development
-
-### Prerequisites
-
-- Node.js 20+
-- pnpm 9+
-
-### Setup
+## Development
 
 ```bash
-# Clone the repository
-git clone https://github.com/emitkit/emitkit-sdks.git
-cd @emitkit/jss
-
-# Install dependencies
 pnpm install
-
-# Sync OpenAPI spec
-pnpm run sync
-
-# Generate all SDKs
-pnpm run generate
-
-# Build all packages
-pnpm run build
-
-# Run tests
-pnpm run test
+pnpm build        # the SDK, then the CLI (which bundles it)
+pnpm lint         # types, including src/contract.ts: the SDK's types against the API's
+pnpm test         # callback signatures against the Standard Webhooks library
 ```
 
-### Development Workflow
+`pnpm sync` fetches the API's OpenAPI document into `openapi/`, and
+`pnpm generate` turns it into `packages/js/src/generated/openapi.ts`. The
+daily sync workflow opens a PR when it changes; `pnpm lint` then fails if
+the hand-written types in `packages/js/src/types.ts` fall behind.
+
+### End-to-end tests
+
+Both packages have E2E suites that run against a live EmitKit (`pnpm dev` in
+the server repo, or a deployment where you can make throwaway keys):
 
 ```bash
-# Watch mode for development
-pnpm run dev
-
-# Lint code
-pnpm run lint
-
-# Clean build artifacts
-pnpm run clean
+export EMITKIT_E2E_BASE_URL=http://api.localhost:5391
+export EMITKIT_E2E_API_KEY=emitkit_…    # full access, throwaway project
+export EMITKIT_E2E_READ_KEY=emitkit_…   # read-only key, same project (optional)
+pnpm --filter @emitkit/js test:e2e
+pnpm --filter @emitkit/cli build && pnpm --filter @emitkit/cli test:e2e
 ```
 
-## 📝 Adding a New SDK
-
-1. Create a new package directory: `packages/<language>/`
-2. Add generator configuration
-3. Update `scripts/generate.ts` to include the new SDK
-4. Add package to `SDK_PACKAGES` array
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our [Contributing Guide](./CONTRIBUTING.md) for details.
-
-### Reporting Issues
-
-If you find a bug or have a feature request, please [open an issue](https://github.com/emitkit/emitkit-sdks/issues).
-
-## 📄 License
-
-MIT License - see [LICENSE](./LICENSE) for details
-
-## 🔗 Links
-
-- [EmitKit Documentation](https://emitkit.com/docs)
-- [API Reference](https://api.emitkit.com/api/docs)
-- [OpenAPI Spec](https://api.emitkit.com/api/openapi.json)
-- [Main Repository](https://github.com/emitkit/blip-sk)
-
----
-
-**Note**: These SDKs are automatically generated from the OpenAPI specification. Do not edit generated files directly.
+Releases: see [RELEASING.md](./RELEASING.md).

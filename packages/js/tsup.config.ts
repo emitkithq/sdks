@@ -1,19 +1,20 @@
-import { defineConfig } from 'tsup';
+import { readFileSync } from "node:fs";
+import { defineConfig } from "tsup";
+
+const { version } = JSON.parse(readFileSync("package.json", "utf8")) as {
+  version: string;
+};
 
 export default defineConfig({
-  entry: ['src/index.ts'],
-  format: ['cjs', 'esm'],
-  dts: true,
-  splitting: false,
-  sourcemap: true,
   clean: true,
-  treeshake: true,
-  minify: false,
-  external: [],
-  outExtension({ format }) {
-    return {
-      js: format === 'cjs' ? '.js' : '.mjs',
-      dts: format === 'cjs' ? '.d.ts' : '.d.mts'
-    };
-  }
+  define: { __VERSION__: JSON.stringify(version) },
+  dts: true,
+  entry: ["src/index.ts"],
+  format: ["cjs", "esm"],
+  outExtension: ({ format }) => ({
+    dts: format === "cjs" ? ".d.ts" : ".d.mts",
+    js: format === "cjs" ? ".js" : ".mjs",
+  }),
+  sourcemap: true,
+  target: "es2022",
 });

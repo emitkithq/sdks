@@ -1,0 +1,9 @@
+{
+  "mode": "pre",
+  "tag": "next",
+  "initialVersions": {
+    "@emitkit/cli": "0.0.0",
+    "@emitkit/js": "2.1.1"
+  },
+  "changesets": []
+}

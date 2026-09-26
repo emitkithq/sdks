@@ -1,0 +1,55 @@
+{
+  "name": "@emitkit/cli",
+  "version": "0.0.0",
+  "description": "EmitKit from your terminal: send events, ask people for decisions and wait for the answer, tail your events.",
+  "keywords": [
+    "emitkit",
+    "cli",
+    "events",
+    "push notifications",
+    "human in the loop",
+    "approvals",
+    "agents"
+  ],
+  "homepage": "https://emitkit.com/docs/cli",
+  "bugs": {
+    "url": "https://github.com/emitkithq/sdks/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emitkithq/sdks.git",
+    "directory": "packages/cli"
+  },
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "emitkit": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test:e2e": "vitest run --dir e2e",
+    "lint": "tsc --noEmit",
+    "clean": "rm -rf dist .turbo node_modules",
+    "prepublishOnly": "pnpm run build"
+  },
+  "devDependencies": {
+    "@emitkit/js": "workspace:*",
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "private": true
+}
