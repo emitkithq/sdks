@@ -10,8 +10,20 @@ and npm trusted publishing: no npm token anywhere.
 3. Merging that PR publishes to npm from GitHub Actions, with provenance.
 
 Each package trusts `release.yml` on npm (package settings → Trusted
-publisher → GitHub Actions: `emitkithq` / `sdks` / `release.yml`), and
-Actions may open PRs (Settings → Actions → General).
+publisher → GitHub Actions: `emitkithq` / `sdks` / `release.yml`).
+
+Step 2 needs Actions to be allowed to open PRs (organization and repository
+Settings → Actions → General → "Allow GitHub Actions to create and approve
+pull requests"). While the emitkithq organization has that off, the Release
+workflow stops there; open the release PR by hand instead:
+
+```bash
+git checkout -b release && pnpm changeset version
+git commit -am "chore: release packages" && gh pr create --fill
+```
+
+Merging it runs the Release workflow, which finds no pending changesets and
+publishes.
 
 ## Prereleases (now: `next`)
 
