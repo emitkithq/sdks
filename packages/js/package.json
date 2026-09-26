@@ -45,7 +45,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/emitkit/emitkit-sdks.git",
+    "url": "git+https://github.com/emitkithq/sdks.git",
     "directory": "packages/js"
   },
   "bugs": {

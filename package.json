@@ -5,7 +5,7 @@
   "description": "Official SDKs for EmitKit API - Auto-generated from OpenAPI specification",
   "repository": {
     "type": "git",
-    "url": "https://github.com/emitkit/emitkit-sdks.git"
+    "url": "git+https://github.com/emitkithq/sdks.git"
   },
   "license": "MIT",
   "scripts": {

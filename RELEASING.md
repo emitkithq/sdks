@@ -4,11 +4,9 @@ This guide explains how to release new versions of the EmitKit SDKs.
 
 ## Prerequisites
 
-1. **npm Access**: You need publish access to the `@emitkit` organization on npm
-2. **GitHub Permissions**: Write access to the repository
-3. **Secrets Configured**:
-   - `NPM_TOKEN` - npm authentication token with publish access
-   - `GITHUB_TOKEN` - Automatically provided by GitHub Actions
+1. **npm trusted publishing**: each package on npm trusts this repository's `release.yml` workflow (package settings → Trusted publisher → GitHub Actions: `emitkithq` / `sdks` / `release.yml`, or `npm trust github @emitkit/js --file release.yml --repo emitkithq/sdks --allow-publish`). The workflow publishes with a short-lived OIDC token and provenance; there is no npm token secret.
+2. **GitHub Actions may create pull requests**: Settings → Actions → General → "Allow GitHub Actions to create and approve pull requests", so the built-in `GITHUB_TOKEN` can open the release PR. There is no PAT secret.
+3. **GitHub Permissions**: Write access to the repository
 
 ## Release Process (Automated with Changesets)
 
@@ -59,7 +57,7 @@ When changes are pushed to `main`:
 After the PR is merged:
 
 1. Check npm: https://www.npmjs.com/package/@emitkit/js
-2. Check GitHub Releases: https://github.com/emitkit/emitkit-sdks/releases
+2. Check GitHub Releases: https://github.com/emitkithq/sdks/releases
 
 ## Manual Release (Fallback)
 
