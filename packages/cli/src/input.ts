@@ -19,7 +19,30 @@ export const duration = (value: string, flag: string) => {
   return Number(match[1]) * UNIT_MS[unit];
 };
 
-/** `key=value`, where the value is JSON when it parses (`49`, `true`) and text otherwise. */
+/**
+ * A value from the command line: `true`, `false`, `null`, a number that
+ * reads back the same (`49`, `9.5`; not `1.10`, `007` or ids too big for a
+ * number), or JSON `{…}`/`[…]`/`"…"`. Anything else is text.
+ */
+const valueOf = (raw: string): Json => {
+  if (raw === "true" || raw === "false" || raw === "null") {
+    return JSON.parse(raw) as Json;
+  }
+  const number = Number(raw);
+  if (raw !== "" && Number.isFinite(number) && String(number) === raw && Math.abs(number) <= Number.MAX_SAFE_INTEGER) {
+    return number;
+  }
+  if (/^[[{"]/u.test(raw)) {
+    try {
+      return JSON.parse(raw) as Json;
+    } catch {
+      // Text after all.
+    }
+  }
+  return raw;
+};
+
+/** `key=value` pairs (see `valueOf` for how values are read). */
 export const keyValues = (pairs: readonly string[], flag: string) => {
   const result: Record<string, Json> = {};
   for (const pair of pairs) {
@@ -27,14 +50,7 @@ export const keyValues = (pairs: readonly string[], flag: string) => {
     if (at <= 0) {
       throw new UsageError(`${flag} ${pair}: use key=value`);
     }
-    const raw = pair.slice(at + 1);
-    let value: Json = raw;
-    try {
-      value = JSON.parse(raw) as Json;
-    } catch {
-      // Plain text.
-    }
-    result[pair.slice(0, at)] = value;
+    result[pair.slice(0, at)] = valueOf(pair.slice(at + 1));
   }
   return result;
 };

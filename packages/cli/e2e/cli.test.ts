@@ -168,12 +168,26 @@ describe.runIf(run)("emitkit CLI against a live API", () => {
     expect(channels.stdout).toContain(channel);
   });
 
-  it("send --input: a whole event as JSON on stdin", async () => {
-    const result = await cli(["send", "--input", "-", "--json"], {
-      stdin: JSON.stringify({ channelName: channel, notify: false, title: "From JSON" }),
-    });
+  it("send --input: a whole event as JSON on stdin, with flags on top", async () => {
+    const result = await cli(
+      ["send", "--input", "-", "-t", "urgent", "-m", "version=1.10", "-m", "build=42", "--json"],
+      {
+        stdin: JSON.stringify({
+          channelName: channel,
+          metadata: { from: "json" },
+          notify: false,
+          tags: ["ci"],
+          title: "From JSON",
+        }),
+      }
+    );
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.stdout).title).toBe("From JSON");
+    expect(JSON.parse(result.stdout)).toMatchObject({
+      // 1.10 isn't a number that reads back the same: it stays text.
+      metadata: { build: 42, from: "json", version: "1.10" },
+      tags: ["ci", "urgent"],
+      title: "From JSON",
+    });
   });
 
   it("API errors: exit 1, code on stderr, JSON with --json", async () => {
@@ -183,7 +197,10 @@ describe.runIf(run)("emitkit CLI against a live API", () => {
     expect(JSON.parse(result.stderr).error).toMatchObject({ code: "not_found", status: 404 });
   });
 
-  it("ask: --no-wait prints the answer page; --timeout exits 124; expiry exits 1", async () => {
+  it("ask: --no-wait prints the answer page; --timeout exits 124; expiry exits 3", async () => {
+    const nothing = await cli(["ask", channel, "No buttons", "--no-wait"]);
+    expect(nothing.code).toBe(2);
+    expect(nothing.stderr).toContain("needs a button");
     const noWait = await cli(["ask", channel, "Ship it?", "-b", "ship", "-b", "wait:Not yet", "--no-wait"]);
     expect(noWait.code).toBe(0);
     expect(noWait.stdout).toMatch(/^Asked event_\S+\s+\S+\/a\/event_/u);
@@ -215,7 +232,7 @@ describe.runIf(run)("emitkit CLI against a live API", () => {
       "10s",
       "--json",
     ]);
-    expect(expired.code).toBe(1);
+    expect(expired.code).toBe(3);
     const asked = JSON.parse(expired.stdout);
     expect(asked.answer.status).toBe("expired");
     expect(asked.fields).toEqual([

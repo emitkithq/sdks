@@ -50,6 +50,7 @@ export interface AskOptions extends CreateOptions {
 export type Asked = Event & { answer: NonNullable<Event["answer"]> };
 
 interface Request {
+  readonly signal?: AbortSignal | undefined;
   readonly method: "GET" | "POST" | "DELETE";
   readonly path: string;
   readonly body?: unknown;
@@ -63,9 +64,18 @@ const RETRY_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 /** Don't sleep through a long rate-limit window: give the caller the 429. */
 const MAX_RETRY_WAIT_SECONDS = 10;
 
-const env = (name: string) =>
-  (globalThis as { process?: { env?: Record<string, string | undefined> } })
-    .process?.env?.[name];
+/** An environment variable, or undefined (no `process`, no permission, or empty). */
+const env = (name: string) => {
+  try {
+    const value = (
+      globalThis as { process?: { env?: Record<string, string | undefined> } }
+    ).process?.env?.[name];
+    return value || undefined;
+  } catch {
+    // Deno without --allow-env for this variable.
+    return undefined;
+  }
+};
 
 const sleep = (ms: number, signal?: AbortSignal) =>
   new Promise<void>((resolve, reject) => {
@@ -120,8 +130,9 @@ export class EmitKit {
 
   constructor(apiKey?: string | EmitKitOptions, options: EmitKitOptions = {}) {
     const settings = typeof apiKey === "string" ? { ...options, apiKey } : { ...apiKey, ...options };
-    this.#apiKey = settings.apiKey ?? env("EMITKIT_API_KEY");
-    this.#baseUrl = (settings.baseUrl ?? env("EMITKIT_BASE_URL") ?? "https://api.emitkit.com").replace(/\/+$/u, "");
+    // Only read the environment for what wasn't passed (Deno asks per variable).
+    this.#apiKey = settings.apiKey || env("EMITKIT_API_KEY");
+    this.#baseUrl = (settings.baseUrl || env("EMITKIT_BASE_URL") || "https://api.emitkit.com").replace(/\/+$/u, "");
     this.#timeout = settings.timeout ?? 30_000;
     this.#maxRetries = settings.maxRetries ?? 2;
     this.#fetch = settings.fetch;
@@ -129,20 +140,22 @@ export class EmitKit {
 
   readonly events = {
     /** Sends an event. With buttons or fields it asks, and waits for an answer (see `ask`). */
-    create: (input: CreateEventInput, options: CreateOptions = {}) =>
+    create: (input: CreateEventInput, options: CreateOptions & { signal?: AbortSignal } = {}) =>
       this.#request<Event>({
         body: input,
         idempotencyKey: options.idempotencyKey ?? crypto.randomUUID(),
         method: "POST",
         path: "/v1/events",
         retry: true,
+        signal: options.signal,
       }),
     /** One event by id, with its answer. */
-    get: (id: string) =>
+    get: (id: string, options: { signal?: AbortSignal } = {}) =>
       this.#request<Event>({
         method: "GET",
         path: `/v1/events/${encodeURIComponent(id)}`,
         retry: true,
+        signal: options.signal,
       }),
     /** A page of the project's events, newest first. */
     list: (input: ListEventsInput = {}) =>
@@ -224,11 +237,22 @@ export class EmitKit {
         code: "validation_error",
       });
     }
+    const { signal } = options;
+    signal?.throwIfAborted();
     const deadline = options.timeout === undefined ? Number.POSITIVE_INFINITY : Date.now() + options.timeout;
     let event = await this.events.create(input, options);
     while (event.answer?.status === "pending" && Date.now() < deadline) {
-      await sleep(Math.min(options.pollInterval ?? 3000, Math.max(0, deadline - Date.now())), options.signal);
-      event = await this.events.get(event.id);
+      await sleep(Math.min(options.pollInterval ?? 3000, Math.max(0, deadline - Date.now())), signal);
+      try {
+        event = await this.events.get(event.id, { signal });
+      } catch (error) {
+        // A long wait outlives a spent rate limit (other traffic on the key): wait it out.
+        if (error instanceof EmitKitError && error.code === "rate_limited") {
+          await sleep((error.retryAfter ?? 60) * 1000, signal);
+          continue;
+        }
+        throw error;
+      }
     }
     if (!event.answer) {
       throw new EmitKitError("The event doesn't wait for an answer", { code: "not_waiting" });
@@ -264,18 +288,24 @@ export class EmitKit {
     const send = this.#fetch ?? globalThis.fetch;
     for (let attempt = 0; ; attempt += 1) {
       const retriesLeft = request.retry && attempt < this.#maxRetries;
+      request.signal?.throwIfAborted();
+      const timeout = AbortSignal.timeout(this.#timeout);
       let response: Response;
+      let text: string;
       try {
         response = await send(url, {
           body,
           headers,
           method: request.method,
-          signal: AbortSignal.timeout(this.#timeout),
+          signal: request.signal ? AbortSignal.any([request.signal, timeout]) : timeout,
         });
+        text = await response.text();
       } catch (cause) {
+        request.signal?.throwIfAborted();
+        this.lastResponse = null;
         const timedOut = cause instanceof Error && cause.name === "TimeoutError";
         if (retriesLeft) {
-          await sleep(backoff(attempt));
+          await sleep(backoff(attempt), request.signal);
           continue;
         }
         throw new EmitKitError(
@@ -284,17 +314,22 @@ export class EmitKit {
         );
       }
       const retryAfter = Number(response.headers.get("retry-after") ?? Number.NaN);
-      if (retriesLeft && RETRY_STATUSES.has(response.status) && !(retryAfter > MAX_RETRY_WAIT_SECONDS)) {
-        await response.body?.cancel();
-        await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : backoff(attempt));
+      // A retry that finds its first attempt still running (it timed out on
+      // our side) gets 409 for the same key: wait for that attempt's result.
+      const stillRunning = attempt > 0 && response.status === 409 && request.idempotencyKey !== undefined;
+      if (
+        retriesLeft &&
+        (stillRunning || RETRY_STATUSES.has(response.status)) &&
+        !(retryAfter > MAX_RETRY_WAIT_SECONDS)
+      ) {
+        await sleep(Number.isFinite(retryAfter) ? retryAfter * 1000 : backoff(attempt), request.signal);
         continue;
       }
-      return this.#read<T>(response, Number.isFinite(retryAfter) ? retryAfter : null);
+      return this.#read<T>(response, text, Number.isFinite(retryAfter) ? retryAfter : null);
     }
   }
 
-  async #read<T>(response: Response, retryAfter: number | null): Promise<T> {
-    const text = await response.text();
+  #read<T>(response: Response, text: string, retryAfter: number | null): T {
     let json: Record<string, unknown> = {};
     try {
       json = text ? (JSON.parse(text) as Record<string, unknown>) : {};

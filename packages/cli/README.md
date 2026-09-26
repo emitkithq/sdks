@@ -32,10 +32,13 @@ emitkit channels
 emitkit identify user_123 -p plan=pro -a jane@example.com
 ```
 
-`-m key=value` and `-p key=value` read values as JSON when they parse
-(`amount=49` is a number, `trial=true` a boolean), and as text otherwise.
+`-m key=value` and `-p key=value` read `true`, `false`, `null`, numbers that
+read back the same (`amount=49`, but not `version=1.10` or `007`), and JSON
+`{…}`, `[…]` or `"…"`; anything else is text. Quote to force text:
+`-m 'orderId="123"'`.
 
-For anything the flags don't cover, pass the whole event as JSON:
+For anything the flags don't cover, pass the whole event as JSON (flags
+add to it):
 
 ```bash
 cat refund.json | emitkit ask --input -
@@ -46,9 +49,9 @@ cat refund.json | emitkit ask --input -
 `--json` prints JSON on stdout, and errors as JSON on stderr:
 `{ "error": { "code": "validation_error", "message": …, "details": […] } }`.
 
-`ask` exits `0` when answered, `1` when the question expired or was
+`ask` exits `0` when answered, `3` when the question expired or was
 canceled, and `124` when it's still waiting at `--timeout`. Usage mistakes
-exit `2`, API errors `1`.
+exit `2`, API and network errors `1`.
 
 ```bash
 if emitkit ask deploys "Ship it?" -b ship -b hold --timeout 1h --json > answer.json \

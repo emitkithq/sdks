@@ -15,6 +15,10 @@ const event = await emitkit.events.create(input);
 const { requestId, rateLimit, replayed } = emitkit.lastResponse ?? {};
 ```
 
+`client.rateLimit` is gone too: read `emitkit.lastResponse?.rateLimit`. Its
+`reset` is when the window resets in Unix seconds (2.x had `resetIn` in
+milliseconds).
+
 ## 2. One error class, with `code`
 
 `RateLimitError` and `ValidationError` are gone; every error is an

@@ -40,9 +40,27 @@ const same = (left: Uint8Array, right: Uint8Array) => {
 const invalid = (message: string) =>
   new EmitKitError(message, { code: "invalid_signature" });
 
-const env = (name: string) =>
-  (globalThis as { process?: { env?: Record<string, string | undefined> } })
-    .process?.env?.[name];
+const env = (name: string) => {
+  try {
+    return (
+      (globalThis as { process?: { env?: Record<string, string | undefined> } })
+        .process?.env?.[name] || undefined
+    );
+  } catch {
+    return undefined;
+  }
+};
+
+/** Any Request-like object (the global one, undici's, a polyfill's). */
+interface RequestLike {
+  readonly headers: Headers;
+  text(): Promise<string>;
+}
+const isRequest = (input: unknown): input is RequestLike =>
+  typeof input === "object" &&
+  input !== null &&
+  typeof (input as RequestLike).text === "function" &&
+  typeof (input as RequestLike).headers?.get === "function";
 
 /**
  * Checks that a callback came from EmitKit and returns it. Callbacks are
@@ -61,7 +79,7 @@ const env = (name: string) =>
  * Throws `EmitKitError` with code `invalid_signature` when it doesn't check out.
  */
 export const verifyCallback = async (
-  input: Request | { body: string; headers: Headers_ },
+  input: Request | RequestLike | { body: string; headers: Headers_ },
   options: VerifyCallbackOptions = {}
 ): Promise<Callback> => {
   const secret = options.secret ?? env("EMITKIT_CALLBACK_SECRET");
@@ -71,7 +89,15 @@ export const verifyCallback = async (
       { code: "invalid_signature" }
     );
   }
-  const body = input instanceof Request ? await input.text() : input.body;
+  let body: string;
+  try {
+    body = isRequest(input) ? await input.text() : input.body;
+  } catch (cause) {
+    throw new EmitKitError("Couldn't read the callback's body (was it read already?)", {
+      cause,
+      code: "invalid_signature",
+    });
+  }
   const headers = input.headers;
   const id = header(headers, "webhook-id");
   const timestamp = header(headers, "webhook-timestamp");
@@ -84,13 +110,21 @@ export const verifyCallback = async (
   if (!Number.isInteger(seconds) || Math.abs(Date.now() / 1000 - seconds) > tolerance) {
     throw invalid("The callback's timestamp is too old or in the future");
   }
-  const key = await crypto.subtle.importKey(
-    "raw",
-    decodeBase64(secret.replace(/^whsec_/u, "")),
-    { hash: "SHA-256", name: "HMAC" },
-    false,
-    ["sign"]
-  );
+  let key: Awaited<ReturnType<typeof crypto.subtle.importKey>>;
+  try {
+    key = await crypto.subtle.importKey(
+      "raw",
+      decodeBase64(secret.replace(/^whsec_/u, "")),
+      { hash: "SHA-256", name: "HMAC" },
+      false,
+      ["sign"]
+    );
+  } catch (cause) {
+    throw new EmitKitError(
+      "The callback signing secret isn't valid: copy the whole whsec_… value from Settings → API keys",
+      { cause, code: "invalid_signature" }
+    );
+  }
   const expected = new Uint8Array(
     await crypto.subtle.sign("HMAC", key, encoder.encode(`${id}.${timestamp}.${body}`))
   );
@@ -109,5 +143,9 @@ export const verifyCallback = async (
   if (!matches) {
     throw invalid("The callback's signature doesn't match this secret");
   }
-  return JSON.parse(body) as Callback;
+  try {
+    return JSON.parse(body) as Callback;
+  } catch (cause) {
+    throw new EmitKitError("The callback's body isn't JSON", { cause, code: "invalid_signature" });
+  }
 };

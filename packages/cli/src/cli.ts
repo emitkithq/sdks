@@ -41,7 +41,7 @@ Usage: emitkit <command> [options]
       --timeout <duration>       stop waiting after this (the question stays open)
       --no-wait                  print the event and exit
       -d, -i, -m, --input        as for send
-    Exit code: 0 answered, 1 expired or canceled, 124 still waiting at --timeout.
+    Exit code: 0 answered, 3 expired or canceled, 124 still waiting at --timeout.
 
   get <id>                     One event, with its answer.
   cancel <id>                  Stop an event from waiting for an answer.
@@ -57,7 +57,8 @@ Options for every command:
                        saved URL, then https://api.emitkit.com.
   -h, --help           -v, --version
 
-Send --input <file|-> with send or ask to pass a whole event as JSON.
+With send or ask, --input <file|-> reads a whole event as JSON; flags add to it.
+Exit codes: 0 ok, 1 API or network error, 2 usage mistake.
 Docs: https://emitkit.com/docs/cli`;
 
 type Options = NonNullable<ParseArgsConfig["options"]>;
@@ -126,24 +127,24 @@ const positional = (values: readonly string[], index: number, name: string) => {
   return value;
 };
 
-/** send and ask: the event from --input, or from the arguments and flags. */
+/** send and ask: the event from --input or the arguments, with the flags on top. */
 const eventFrom = async (
   values: Record<string, unknown>,
   args: readonly string[]
 ): Promise<CreateEventInput> => {
-  if (typeof values.input === "string") {
-    return readInput(values.input);
-  }
-  const tags = values.tag as string[] | undefined;
-  const meta = values.meta as string[] | undefined;
+  const base: CreateEventInput =
+    typeof values.input === "string"
+      ? await readInput(values.input)
+      : { channelName: positional(args, 0, "channel"), title: positional(args, 1, "title") };
+  const tags = (values.tag as string[] | undefined) ?? [];
+  const meta = (values.meta as string[] | undefined) ?? [];
   return {
-    channelName: positional(args, 0, "channel"),
-    title: positional(args, 1, "title"),
+    ...base,
     ...(typeof values.description === "string" ? { description: values.description } : {}),
     ...(typeof values.icon === "string" ? { icon: values.icon } : {}),
     ...(typeof values.user === "string" ? { userId: values.user } : {}),
-    ...(tags?.length ? { tags } : {}),
-    ...(meta?.length ? { metadata: keyValues(meta, "--meta") } : {}),
+    ...(tags.length ? { tags: [...(base.tags ?? []), ...tags] } : {}),
+    ...(meta.length ? { metadata: { ...base.metadata, ...keyValues(meta, "--meta") } } : {}),
   };
 };
 
@@ -300,6 +301,11 @@ const ask = async (
       ? { expiresIn: Math.round(duration(option.expires, "--expires") / 1000) }
       : {}),
   };
+  const asksSomething =
+    (input.fields?.length ?? 0) > 0 || (input.actions ?? []).some((action) => "id" in action);
+  if (!asksSomething) {
+    throw new UsageError("ask needs a button (-b) or a field (--text, --choice)");
+  }
   if (option["no-wait"]) {
     const event = await emitkit.events.create(input);
     print(json, event, () => `${green("Asked")} ${event.id}  ${dim(event.answer?.url ?? "")}`);
@@ -321,36 +327,59 @@ const ask = async (
       return 124;
     }
     default: {
-      return 1;
+      return 3;
     }
   }
 };
 
+/** How far back each check looks: events can commit a little after their createdAt. */
+const TAIL_OVERLAP_MS = 30_000;
+
 const tail = async (emitkit: EmitKit, option: Record<string, unknown>, json: boolean) => {
   const channel = option.channel as string | undefined;
   const interval = duration((option.interval as string | undefined) ?? "5s", "--interval");
-  const seen = new Set<string>();
+  // Ids shown, with their time: forgotten once they fall out of the overlap.
+  const seen = new Map<string, number>();
   const show = (events: readonly Event[]) => {
     for (const event of events.toReversed()) {
       if (!seen.has(event.id)) {
-        seen.add(event.id);
+        seen.set(event.id, Date.parse(event.createdAt));
         process.stdout.write(`${json ? JSON.stringify(event) : eventLine(event)}\n`);
       }
     }
   };
+  /** Everything since `since`, all pages, newest first. */
+  const since = async (from: string) => {
+    const events: Event[] = [];
+    let before: string | undefined;
+    do {
+      const page = await emitkit.events.list({ before, channel, limit: 100, since: from });
+      events.push(...page.events);
+      before = page.nextCursor ?? undefined;
+    } while (before);
+    return events;
+  };
   const first = await emitkit.events.list({ channel, limit: 20 });
   show(first.events);
-  let since = first.events[0]?.createdAt ?? new Date().toISOString();
+  let newest = first.events[0] ? Date.parse(first.events[0].createdAt) : Date.now();
   for (;;) {
     await new Promise((resolve) => setTimeout(resolve, interval));
-    // since is inclusive: events at the same instant are skipped by id.
-    const page = await emitkit.events.list({ channel, limit: 100, since });
-    show(page.events);
-    since = page.events[0]?.createdAt ?? since;
-    if (seen.size > 10_000) {
-      seen.clear();
-      for (const event of page.events) {
-        seen.add(event.id);
+    const from = new Date(newest - TAIL_OVERLAP_MS).toISOString();
+    let events: Event[];
+    try {
+      events = await since(from);
+    } catch (error) {
+      if (error instanceof EmitKitError && error.code === "rate_limited") {
+        await new Promise((resolve) => setTimeout(resolve, (error.retryAfter ?? 60) * 1000));
+        continue;
+      }
+      throw error;
+    }
+    show(events);
+    newest = Math.max(newest, ...events.map((event) => Date.parse(event.createdAt)));
+    for (const [id, at] of seen) {
+      if (at < newest - 2 * TAIL_OVERLAP_MS) {
+        seen.delete(id);
       }
     }
   }

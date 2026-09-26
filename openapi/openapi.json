@@ -691,23 +691,14 @@
           },
           "user_id": {
             "deprecated": true,
-            "description": "The old name of userId; if both are sent they must match",
+            "description": "Deprecated: the old name of userId, still accepted in its place. If both are sent they must match.",
             "minLength": 1,
             "type": "string"
           }
         },
         "type": "object",
-        "anyOf": [
-          {
-            "required": [
-              "userId"
-            ]
-          },
-          {
-            "required": [
-              "user_id"
-            ]
-          }
+        "required": [
+          "userId"
         ]
       },
       "IdentifyUserResponse": {
@@ -1862,7 +1853,7 @@
                   "string",
                   "null"
                 ],
-                "description": "Pass as before for the next page; null on the last page."
+                "description": "Pass as before for the next page; null on the last page. Opaque: don't parse it."
               }
             },
             "required": [
@@ -2486,11 +2477,11 @@
         "x-emitkit-permission": "events:create"
       },
       "get": {
-        "description": "The Project's events, newest first, each with its fields, actions and answer (as getEvent returns it). Page with before: pass the previous page's nextCursor. Deleted events and events in deleted channels are left out.",
+        "description": "The Project's events, newest first, each with its fields, actions and answer (as getEvent returns it). Page with before: pass the previous page's nextCursor (an opaque position; a time works too). Times are ISO 8601 with their zone. Unknown parameters are refused. Deleted events and events in deleted channels are left out.",
         "operationId": "listEvents",
         "parameters": [
           {
-            "description": "Only events before this time: pass nextCursor to get the next page",
+            "description": "Only events before this point: the previous page's nextCursor, or a time",
             "in": "query",
             "name": "before",
             "required": false,
@@ -3165,7 +3156,7 @@
     },
     "/v1/identify": {
       "post": {
-        "description": "Creates or updates the Organization-scoped identity for user_id. Properties are merged into the stored ones (new values replace old ones; keys you leave out are kept), and each alias moves to this identity.",
+        "description": "Creates or updates the Organization-scoped identity for userId (user_id is its old name and still works). Properties are merged into the stored ones (new values replace old ones; keys you leave out are kept), and each alias moves to this identity.",
         "operationId": "identifyUser",
         "requestBody": {
           "content": {

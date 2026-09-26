@@ -33,7 +33,7 @@ export interface paths {
         };
         /**
          * List events
-         * @description The Project's events, newest first, each with its fields, actions and answer (as getEvent returns it). Page with before: pass the previous page's nextCursor. Deleted events and events in deleted channels are left out.
+         * @description The Project's events, newest first, each with its fields, actions and answer (as getEvent returns it). Page with before: pass the previous page's nextCursor (an opaque position; a time works too). Times are ISO 8601 with their zone. Unknown parameters are refused. Deleted events and events in deleted channels are left out.
          */
         get: operations["listEvents"];
         put?: never;
@@ -119,7 +119,7 @@ export interface paths {
         put?: never;
         /**
          * Identify User
-         * @description Creates or updates the Organization-scoped identity for user_id. Properties are merged into the stored ones (new values replace old ones; keys you leave out are kept), and each alias moves to this identity.
+         * @description Creates or updates the Organization-scoped identity for userId (user_id is its old name and still works). Properties are merged into the stored ones (new values replace old ones; keys you leave out are kept), and each alias moves to this identity.
          */
         post: operations["identifyUser"];
         delete?: never;
@@ -439,13 +439,13 @@ export interface components {
                 [key: string]: components["schemas"]["JsonValue"];
             };
             /** @description Your id for the user */
-            userId?: string;
+            userId: string;
             /**
              * @deprecated
-             * @description The old name of userId; if both are sent they must match
+             * @description Deprecated: the old name of userId, still accepted in its place. If both are sent they must match.
              */
             user_id?: string;
-        } | unknown | unknown;
+        };
         IdentifyUserResponse: {
             data: {
                 aliases: {
@@ -858,7 +858,7 @@ export interface components {
             data: {
                 /** @description Newest first. */
                 events: components["schemas"]["Event"][];
-                /** @description Pass as before for the next page; null on the last page. */
+                /** @description Pass as before for the next page; null on the last page. Opaque: don't parse it. */
                 nextCursor: string | null;
             };
             /** Format: uuid */
@@ -1011,7 +1011,7 @@ export interface operations {
     listEvents: {
         parameters: {
             query?: {
-                /** @description Only events before this time: pass nextCursor to get the next page */
+                /** @description Only events before this point: the previous page's nextCursor, or a time */
                 before?: string;
                 /** @description Only this channel (its name) */
                 channel?: string;

@@ -2,7 +2,7 @@
 
 The EmitKit SDK for TypeScript and JavaScript. Send events to your phone, ask
 a person for a decision and get the answer back, list what happened, and
-verify callbacks. No dependencies; runs on Node 20+, Bun, Deno, Cloudflare
+verify callbacks. No dependencies; runs on Node 20.3+, Bun, Deno, Cloudflare
 Workers and anything else with `fetch`.
 
 ```bash
@@ -64,7 +64,8 @@ if (answer.status === "answered" && answer.action === "approve") {
 `ask` sends the event, then checks every 3 seconds until it's answered,
 expires or is canceled, and returns the event with its `answer`. Pass
 `{ timeout }` (ms) to stop waiting earlier (the answer is then still
-`pending`), or a `signal` to abort. A network retry never asks twice.
+`pending`), or a `signal` to abort. A network retry never asks twice, and a
+spent rate limit during the wait is waited out.
 
 Field types: `choice` (with `multiple` for checkboxes), `text`, `number`,
 `boolean`. `answer.values` holds each field's value by its `id`.
@@ -175,6 +176,7 @@ try {
 | `rate_limited` | Over 100 requests a minute; `retryAfter` says how long to wait |
 | `internal_error` | Something failed on EmitKit's side |
 | `network_error`, `timeout` | No response |
+| `http_<status>` | A response that wasn't EmitKit's (a proxy's error page, say) |
 | `missing_api_key` | No key passed and no `EMITKIT_API_KEY` |
 | `invalid_signature` | `verifyCallback` rejected the callback |
 

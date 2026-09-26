@@ -35,10 +35,17 @@ jobs:
       - name: Generate SDKs
         run: pnpm run generate
 
+      # PRs opened with GITHUB_TOKEN don't trigger the Test workflow, so the
+      # contract check (src/contract.ts) runs here and titles the PR.
+      - name: Type check against the new spec
+        id: types
+        continue-on-error: true
+        run: pnpm run lint
+
       - name: Check for changes
         id: check
         run: |
-          git diff --quiet openapi/openapi.json packages/*/src/generated || echo "changed=true" >> $GITHUB_OUTPUT
+          git diff --quiet openapi/openapi.json packages/js/src/generated || echo "changed=true" >> $GITHUB_OUTPUT
 
       - name: Create Pull Request
         if: steps.check.outputs.changed == 'true'
@@ -46,7 +53,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: 'chore: sync OpenAPI spec and regenerate SDKs'
-          title: 'chore: sync OpenAPI spec'
+          title: ${{ steps.types.outcome == 'success' && 'chore: sync OpenAPI spec' || 'chore: sync OpenAPI spec (SDK types need updating)' }}
           body: |
             ## OpenAPI Spec Update
 

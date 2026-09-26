@@ -3,7 +3,8 @@
  * (`validation_error`, `unauthorized`, `forbidden`, `not_found`,
  * `idempotency_conflict`, `not_pending`, `not_waiting`, `payload_too_large`,
  * `rate_limited`, `internal_error`), or the SDK's own: `network_error`,
- * `timeout`, `invalid_signature`, `missing_api_key`.
+ * `timeout`, `invalid_signature`, `missing_api_key`, and `http_<status>` for a
+ * response that wasn't EmitKit's (a proxy's error page).
  */
 export class EmitKitError extends Error {
   override readonly name = "EmitKitError";
