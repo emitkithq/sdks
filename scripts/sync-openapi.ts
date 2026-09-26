@@ -9,18 +9,24 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
-const url = process.env.EMITKIT_OPENAPI_URL ?? "https://api.emitkit.com/openapi.json";
+const sync = async () => {
+  const url = process.env.EMITKIT_OPENAPI_URL ?? "https://api.emitkit.com/openapi.json";
 
-const response = await fetch(url);
-if (!response.ok) {
-  console.error(`Couldn't fetch ${url}: HTTP ${response.status}`);
-  process.exit(1);
-}
-const spec = (await response.json()) as { openapi?: string; paths?: object };
-if (!(spec.openapi && spec.paths)) {
-  console.error(`${url} isn't an OpenAPI document`);
-  process.exit(1);
-}
-const path = join(process.cwd(), "openapi", "openapi.json");
-await writeFile(path, `${JSON.stringify(spec, null, 2)}\n`);
-console.log(`Synced ${Object.keys(spec.paths).length} paths from ${url}`);
+  const response = await fetch(url);
+  if (!response.ok) {
+    console.error(`Couldn't fetch ${url}: HTTP ${response.status}`);
+    process.exitCode = 1;
+    return;
+  }
+  const spec = (await response.json()) as { openapi?: string; paths?: object };
+  if (!(spec.openapi && spec.paths)) {
+    console.error(`${url} isn't an OpenAPI document`);
+    process.exitCode = 1;
+    return;
+  }
+  const path = join(process.cwd(), "openapi", "openapi.json");
+  await writeFile(path, `${JSON.stringify(spec, null, 2)}\n`);
+  console.log(`Synced ${Object.keys(spec.paths).length} paths from ${url}`);
+};
+
+sync();
