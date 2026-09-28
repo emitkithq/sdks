@@ -35,21 +35,14 @@ The repository is in Changesets pre mode with the `next` tag
 To release 3.0.0 as `latest`: `pnpm changeset pre exit`, commit, merge, then
 merge the release PR.
 
-## The CLI's first publish
+## Adding a package
 
-`@emitkit/cli` doesn't exist on npm yet, and trusted publishing can only be
-set up for a package that exists. It is `"private": true` until then, so
-releases skip it. Once, by hand:
-
-```bash
-pnpm install && pnpm build
-cd packages/cli
-# remove "private": true from package.json, then:
-npm publish --access public --tag next      # asks for your 2FA code
-npm trust github @emitkit/cli --file release.yml --repo emitkithq/sdks --allow-publish
-```
-
-Commit the removed `"private": true`; from then on the CLI releases like the SDK.
+npm trusted publishing can only be set up for a package that exists, so a new
+package's first version is published by hand (`npm publish --access public
+--tag next`, with your 2FA code), then trusted on npmjs.com: package →
+Settings → Trusted Publisher → GitHub Actions, organization `emitkithq`,
+repository `sdks`, workflow `release.yml`. From then on it releases like the
+others. `@emitkit/cli` went this way with 0.1.0-next.0.
 
 ## Syncing the API
 
