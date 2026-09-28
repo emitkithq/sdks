@@ -1,6 +1,6 @@
 {
   "name": "@emitkit/cli",
-  "version": "0.1.0-next.0",
+  "version": "0.1.0",
   "description": "EmitKit from your terminal: send events, ask people for decisions and wait for the answer, tail your events.",
   "keywords": [
     "emitkit",
