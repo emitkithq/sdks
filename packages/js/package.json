@@ -1,6 +1,6 @@
 {
   "name": "@emitkit/js",
-  "version": "3.0.0-next.0",
+  "version": "3.0.0",
   "description": "The EmitKit SDK: send events, ask people for decisions from their phone, and read the answers.",
   "keywords": [
     "emitkit",
